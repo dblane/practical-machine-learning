@@ -1,0 +1,90 @@
+---
+title: "Practical Machine Learning Project"
+author: "David Blane"
+date: "August 23, 2015"
+output: html_document
+---
+
+#Course Project 
+##Summary
+Since excersize data is awesome and people use it all the time on their wearable-tech these days, we're looking at a data set of six research study participants. The data is tracked using accelerometers on the belt, arm and dumbells. It's split into to sets, training and testing. 
+
+The Training data holds the values of the quality of the activity while the Testing data holds the values of data without labels. We want to use an algorithm to predict the labels for the test data. 
+
+#Tidy train set
+Loadn' the data
+```{r}
+library(caret)
+train<-read.csv("pml-training.csv")
+test<-read.csv("pml-testing.csv")
+```
+In order to break apart the data and create a out-of-sample test, we'll split the training set into two parts. 
+```{r}
+set.seed(3)
+insample<- createDataPartition(y=train$classe,p=0.7, list=F)
+trainsmall<-train[insample,]
+trainval<-train[-insample,]
+```
+Time to remove unnecessary variables from the data set in order to provide a clearer prediction.
+```{r}
+nearZero<-nearZeroVar(trainsmall)
+trainsmall<-trainsmall[,-nearZero]
+trainval<-trainval[,-nearZero]
+nananana<-sapply(trainsmall, function(x) mean (is.na(x))) >0.95
+trainsmall <- trainsmall[, nananana==F]
+trainval <- trainval[, nananana==F]
+trainsmall <- trainsmall[, -(1:5)]
+trainval<- trainval[, -(1:5)]
+```
+
+#Ye old Algorithm
+Using a Random Forest model fitted with trainsmall and cross validated using the train function.
+```{r}
+control<-trainControl(method="cv",number=3,verboseIter=F)
+fit<-train(classe ~ .,data=trainsmall,method="rf",trControl=control)
+fit$finalModel
+```
+#Evaluation
+Using our model, we'll now predict for label "classe" in trainval. 
+```{r}
+predict<-predict(fit,newdata=trainval)
+confusionMatrix(trainval$classe,predict)
+```
+The accuracy is 99.6% and the out-of-sample error is .4%. 
+Since this is a highly accurate test, we'll continue to use Random Forest to pret the test.
+
+#tidy full data
+Using the same method as before we're removing unnecessary variables from the data. 
+```{r}
+nearZero2<-nearZeroVar(train)
+train<-train[,-nearZeroVar]
+test<-test[,-nearZeroVar]
+nananana2 <-sapply(train,function(x) mean(is.na(x))) > .95
+train<-train[,nananana2==F]
+test<-train[,nananana2==F]
+train<-train[,-(1:5)]
+test<-test[,-(1:5)]
+control2 <-trainControl(method="cv",number=3,verboseIter=F)
+fit2<-train(classe ~ .,data=train,method="rf",trControl=fitControl)
+```
+#Predictions
+Using test data to predict the label for observations and write them to files.
+```{r}
+predict2<-predict(fit2,newdata=test)
+predict2<-as.character(predict2)
+writeFiles<- function(x) {
+        n <-length(x)
+        for(i in 1:n) {
+                filename <-paste0("problem_id_",i,".txt")
+                write.table(x[i],file=filename,quote=F,row.names=F,col.names=F)
+        }
+}
+writeFiles(predict2)
+```
+
+
+
+
+
+
+
